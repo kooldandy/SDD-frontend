@@ -44,14 +44,13 @@ jobs:
         run: |
           cd infra
           npm ci
-          # We run deploy and parse the outputs to use in subsequent steps
           npx cdk deploy --require-approval never --outputs-file outputs.json
           
-          # Extract values dynamically from the CDK outputs file
-          BUCKET=$(jq -r '.[] | with_entries(select(.key | contains("S3BucketName"))) | .[].value' outputs.json)
-          DIST_ID=$(jq -r '.[] | with_entries(select(.key | contains("CloudFrontDistribution"))) | .[].value' outputs.json)
+          # 🚀 FIX: Streamlined recursive string-lookup for target keys
+          BUCKET=$(jq -r '.. | .ReactAppS3BucketName? // empty' outputs.json)
+          DIST_ID=$(jq -r '.. | .ReactAppCloudFrontDistributionId? // empty' outputs.json)
           
-          # Save them to the GitHub step environment
+          # Save them to the GitHub step environment matrix
           echo "BUCKET_NAME=$BUCKET" >> $GITHUB_OUTPUT
           echo "DISTRIBUTION_ID=$DIST_ID" >> $GITHUB_OUTPUT
 
