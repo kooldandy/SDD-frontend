@@ -1,0 +1,75 @@
+name: Frontend Infra & App Deployment
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+        AWS_REGION: us-east-1
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      # 1. Setup Node.js Environment
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Project Dependencies
+        run: npm ci
+
+      # 2. Configure AWS Credentials
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # 3. Deploy CloudFront & S3 Infrastructure via CDK
+      - name: Deploy Infrastructure (CDK)
+        id: cdk-deploy
+        run: |
+          cd infra
+          npm ci
+          # We run deploy and parse the outputs to use in subsequent steps
+          npx cdk deploy --require-approval never --outputs-file outputs.json
+          
+          # Extract values dynamically from the CDK outputs file
+          BUCKET=$(jq -r '.[] | with_entries(select(.key | contains("S3BucketName"))) | .[].value' outputs.json)
+          DIST_ID=$(jq -r '.[] | with_entries(select(.key | contains("CloudFrontDistribution"))) | .[].value' outputs.json)
+          
+          # Save them to the GitHub step environment
+          echo "BUCKET_NAME=$BUCKET" >> $GITHUB_OUTPUT
+          echo "DISTRIBUTION_ID=$DIST_ID" >> $GITHUB_OUTPUT
+
+      # 4. Build the React Frontend App (Vite)
+      - name: Build React Application
+        run: npm run build
+        env:
+          # Your FastAPI production URL from your backend repo deployment
+          VITE_API_URL: ${{ secrets.VITE_API_URL }} 
+
+      # 5. Sync Compiled Assets to the newly created S3 Bucket
+      - name: Upload Static Assets to S3
+        run: |
+          aws s3 sync dist/ s3://${{ steps.cdk-deploy.outputs.BUCKET_NAME }} --delete
+
+      # 6. Invalidate CloudFront CDN Cache so changes go live instantly
+      - name: Invalidate CloudFront Cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ steps.cdk-deploy.outputs.DISTRIBUTION_ID }} \
+            --paths "/index.html"
