@@ -105,12 +105,12 @@ export class ReactStaticSiteStack extends cdk.Stack {
       description: "The S3 bucket name to upload your build/ folder to",
     });
 
-    // Ensure these keys match the lookups in your GitHub Actions script
-    new cdk.CfnOutput(this, "ReactAppS3BucketName", {
+    // Ensure these IDs match your jq lookup targets exactly!
+    new cdk.CfnOutput(this, 'ReactAppS3BucketName', {
       value: siteBucket.bucketName,
     });
 
-    new cdk.CfnOutput(this, "ReactAppCloudFrontDistributionId", {
+    new cdk.CfnOutput(this, 'ReactAppCloudFrontDistributionId', {
       value: distribution.distributionId,
     });
   }
