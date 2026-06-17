@@ -8,8 +8,9 @@
  */
 
 import { configureStore } from "@reduxjs/toolkit";
-import productReducer from "./productSlice";
-import apiClient from "../products/productApiClient";
+import productReducer from "../products/productSlice";
+import apiClient from "../api/apiClient";
+import { globalServices } from "./globalService";
 
 export const store = configureStore({
   reducer: {
@@ -27,6 +28,7 @@ export const store = configureStore({
       thunk: {
         extraArgument: {
           api: apiClient,
+          globalServices: globalServices,
         },
       },
     }),

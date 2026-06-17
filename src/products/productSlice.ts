@@ -8,8 +8,7 @@
  */
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
-import { Product, ProductInput } from '../products/productTypes'
-import { productService } from '../products/productService'
+import { Product, ProductInput } from './productTypes'
 import { NormalizedError } from '../api/apiRequest'
 
 export interface ProductState {
@@ -42,7 +41,8 @@ const initialState: ProductState = {
  */
 export const fetchProducts = createAsyncThunk(
   'products/fetchProducts',
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, extra }) => {
+    const { productService } = extra.globalServices;
     try {
       const products = await productService.listProducts()
       return products
@@ -57,7 +57,9 @@ export const fetchProducts = createAsyncThunk(
  */
 export const createProduct = createAsyncThunk(
   'products/createProduct',
-  async (input: ProductInput, { rejectWithValue }) => {
+  async (input: ProductInput, { rejectWithValue, extra }) => {
+        const { productService } = extra.globalServices;
+
     try {
       const product = await productService.createProduct(input)
       return product
@@ -72,7 +74,8 @@ export const createProduct = createAsyncThunk(
  */
 export const updateProduct = createAsyncThunk(
   'products/updateProduct',
-  async ({ id, input }: { id: string; input: ProductInput }, { rejectWithValue }) => {
+  async ({ id, input }: { id: string; input: ProductInput }, { rejectWithValue, extra }) => {
+    const { productService } = extra.globalServices;
     try {
       const product = await productService.updateProduct(id, input)
       return product
@@ -87,7 +90,8 @@ export const updateProduct = createAsyncThunk(
  */
 export const deleteProduct = createAsyncThunk(
   'products/deleteProduct',
-  async (id: string, { rejectWithValue }) => {
+  async (id: string, { rejectWithValue, extra }) => {
+    const { productService } = extra.globalServices;
     try {
       await productService.deleteProduct(id)
       return id

@@ -8,7 +8,7 @@ import {
   clearCreateError,
   clearUpdateError,
   clearDeleteError,
-} from '../app/productSlice'
+} from './productSlice'
 import { AppDispatch, RootState } from '../app/store'
 import { Product, ProductInput } from './productTypes'
 import ProductEditForm from './components/ProductEditForm'

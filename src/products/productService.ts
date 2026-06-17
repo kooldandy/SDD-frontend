@@ -1,4 +1,3 @@
-import apiClient from './productApiClient'
 import { Product, ProductInput } from './productTypes'
 import { BaseApi } from '../api/BaseApi'
 
@@ -9,10 +8,6 @@ import { BaseApi } from '../api/BaseApi'
  * automatic error normalization and Auth0 token injection.
  */
 export class ProductService extends BaseApi {
-  constructor() {
-    super(apiClient)
-  }
-
   /**
    * Fetch all products
    */
@@ -41,7 +36,4 @@ export class ProductService extends BaseApi {
     return this.delete(`/product/${id}`)
   }
 }
-
-// Export singleton instance for use in Redux thunks
-export const productService = new ProductService()
 
