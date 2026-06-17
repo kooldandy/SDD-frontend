@@ -1,5 +1,15 @@
 import React, { useEffect, useState } from 'react'
-import { listProducts, createProduct, updateProduct, deleteProduct } from './productService'
+import { useDispatch, useSelector } from 'react-redux'
+import {
+  fetchProducts,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  clearCreateError,
+  clearUpdateError,
+  clearDeleteError,
+} from '../app/productSlice'
+import { AppDispatch, RootState } from '../app/store'
 import { Product, ProductInput } from './productTypes'
 import ProductEditForm from './components/ProductEditForm'
 import ProductForm from './components/ProductForm'
@@ -9,7 +19,7 @@ const emptyEdit = {
   name: '',
   description: '',
   price: '',
-  quantity: ''
+  quantity: '',
 }
 
 type EditValues = typeof emptyEdit
@@ -21,59 +31,47 @@ function parseEditValues(values: EditValues): { input: ProductInput; errors: Rec
     name: values.name.trim(),
     description: values.description.trim(),
     price,
-    quantity
+    quantity,
   }
   const errors = validateProductInput(input)
   return { input, errors }
 }
 
 export default function ProductManagementPage() {
-  const [products, setProducts] = useState<Product[] | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const dispatch = useDispatch<AppDispatch>()
+
+  // Redux state
+  const { items: products, loading, error, creating, createError, updating, updateError, deletingIds, deleteError } =
+    useSelector((state: RootState) => state.products)
+
+  // Local UI state
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<EditValues>(emptyEdit)
   const [editErrors, setEditErrors] = useState<Record<string, string>>({})
-  const [saving, setSaving] = useState(false)
-  const [statusMessage, setStatusMessage] = useState<string | null>(null)
-
-  useEffect(() => {
-    let mounted = true
-    setLoading(true)
-    listProducts()
-      .then(p => {
-        if (mounted) {
-          setProducts(p)
-          setError(null)
-        }
-      })
-      .catch(() => {
-        if (mounted) setError('Failed to load products')
-      })
-      .finally(() => {
-        if (mounted) setLoading(false)
-      })
-    return () => {
-      mounted = false
-    }
-  }, [])
-
   const [addMode, setAddMode] = useState(false)
   const [addValues, setAddValues] = useState<EditValues>(emptyEdit)
   const [addErrors, setAddErrors] = useState<Record<string, string>>({})
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
+
+  /**
+   * Fetch products on component mount
+   */
+  useEffect(() => {
+    dispatch(fetchProducts())
+  }, [dispatch])
 
   const resetEdit = () => {
     setEditingId(null)
     setEditValues(emptyEdit)
     setEditErrors({})
-    setSaving(false)
+    setStatusMessage(null)
   }
 
   const resetAdd = () => {
     setAddMode(false)
     setAddValues(emptyEdit)
     setAddErrors({})
-    setSaving(false)
+    setStatusMessage(null)
   }
 
   const handleEdit = (product: Product) => {
@@ -88,7 +86,7 @@ export default function ProductManagementPage() {
       name: product.name,
       description: product.description ?? '',
       price: String(product.price),
-      quantity: String(product.quantity)
+      quantity: String(product.quantity),
     })
     setEditErrors({})
     setStatusMessage(null)
@@ -99,8 +97,7 @@ export default function ProductManagementPage() {
     if (!confirmed) return
 
     try {
-      await deleteProduct(id)
-      setProducts(current => current?.filter(item => item.id !== id) ?? null)
+      await dispatch(deleteProduct(id))
       setStatusMessage('Product deleted successfully.')
       if (editingId === id) {
         resetEdit()
@@ -112,13 +109,14 @@ export default function ProductManagementPage() {
   }
 
   const handleFieldChange = (field: keyof EditValues, value: string) => {
-    setEditValues(current => ({ ...current, [field]: value }))
-    setEditErrors(current => {
+    setEditValues((current) => ({ ...current, [field]: value }))
+    setEditErrors((current) => {
       const next = { ...current }
       delete next[field]
       return next
     })
     setStatusMessage(null)
+    dispatch(clearUpdateError())
   }
 
   const handleAddCancel = () => {
@@ -134,21 +132,13 @@ export default function ProductManagementPage() {
       return
     }
 
-    setSaving(true)
     try {
-      const updated = await updateProduct(editingId, input)
-      setProducts(current =>
-        current
-          ? current.map(product => (product.id === editingId ? updated : product))
-          : [updated]
-      )
+      await dispatch(updateProduct({ id: editingId, input }))
       setStatusMessage('Product updated successfully.')
       resetEdit()
     } catch (error) {
       console.error(error)
-      setEditErrors({ form: 'Failed to save changes. Please try again.' })
-    } finally {
-      setSaving(false)
+      setEditErrors({ form: updateError?.message || 'Failed to save changes. Please try again.' })
     }
   }
 
@@ -161,13 +151,14 @@ export default function ProductManagementPage() {
   }
 
   const handleAddChange = (field: keyof EditValues, value: string) => {
-    setAddValues(current => ({ ...current, [field]: value }))
-    setAddErrors(current => {
+    setAddValues((current) => ({ ...current, [field]: value }))
+    setAddErrors((current) => {
       const next = { ...current }
       delete next[field]
       return next
     })
     setStatusMessage(null)
+    dispatch(clearCreateError())
   }
 
   const handleAddSave = async () => {
@@ -177,31 +168,43 @@ export default function ProductManagementPage() {
       return
     }
 
-    setSaving(true)
     try {
-      const created = await createProduct(input)
-      setProducts(current => (current ? [...current, created] : [created]))
+      await dispatch(createProduct(input))
       setStatusMessage('Product added successfully.')
       resetAdd()
     } catch (error) {
       console.error(error)
-      setAddErrors({ form: 'Failed to add product. Please try again.' })
-    } finally {
-      setSaving(false)
+      setAddErrors({ form: createError?.message || 'Failed to add product. Please try again.' })
     }
   }
 
+  // Sync errors to UI
+  useEffect(() => {
+    if (updateError && editingId) {
+      setEditErrors({ form: updateError.message })
+    }
+  }, [updateError, editingId])
+
+  useEffect(() => {
+    if (deleteError) {
+      setStatusMessage(`Failed to delete product: ${deleteError.message}`)
+      dispatch(clearDeleteError())
+    }
+  }, [deleteError, dispatch])
+
   if (loading) return <div>Loading products…</div>
-  if (error) return <div>Error: {error}</div>
+  if (error) return <div>Error: {error.message}</div>
 
   return (
     <div style={{ padding: 16 }}>
       {statusMessage ? <div className="status-message">{statusMessage}</div> : null}
       <div style={{ marginBottom: 16 }}>
-        <button onClick={handleAddClick} className="primary" disabled={Boolean(editingId)}>
+        <button onClick={handleAddClick} className="primary" disabled={Boolean(editingId) || creating}>
           Add Product
         </button>
-        {editingId ? <span className="helper-text">Finish or close the current edit before adding a new product.</span> : null}
+        {editingId ? (
+          <span className="helper-text">Finish or close the current edit before adding a new product.</span>
+        ) : null}
       </div>
       {addMode ? (
         <div className="add-form-panel">
@@ -209,7 +212,7 @@ export default function ProductManagementPage() {
             title="Add New Product"
             values={addValues}
             errors={addErrors}
-            saving={saving}
+            saving={creating}
             status={addErrors.form ?? null}
             onChange={handleAddChange}
             onSave={handleAddSave}
@@ -223,55 +226,67 @@ export default function ProductManagementPage() {
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table className="pm-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th className="desc-col">Description</th>
-              <th>Price</th>
-              <th>Quantity</th>
-              <th>Edit</th>
-              <th>Delete</th>
-            </tr>
-          </thead>
-          <tbody>
-            {products.map(product => (
-              <React.Fragment key={product.id}>
-                <tr>
-                  <td>{product.name}</td>
-                  <td className="desc-col">{product.description ?? '—'}</td>
-                  <td>{`$${product.price.toFixed(2)}`}</td>
-                  <td>{product.quantity}</td>
-                  <td>
-                    <button onClick={() => handleEdit(product)} className="primary" disabled={addMode}>
-                      {editingId === product.id ? 'Close' : 'Edit'}
-                    </button>
-                  </td>
-                  <td>
-                    <button onClick={() => handleDelete(product.id)} className="danger">
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-                {editingId === product.id ? (
-                  <tr className="edit-row">
-                    <td colSpan={6}>
-                      <ProductEditForm
-                        values={editValues}
-                        errors={editErrors}
-                        saving={saving}
-                        status={editErrors.form ?? undefined}
-                        onChange={handleFieldChange}
-                        onSave={handleSave}
-                        onCancel={resetEdit}
-                      />
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th className="desc-col">Description</th>
+                <th>Price</th>
+                <th>Quantity</th>
+                <th>Edit</th>
+                <th>Delete</th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map((product: Product) => (
+                <React.Fragment key={product.id}>
+                  <tr>
+                    <td>{product.name}</td>
+                    <td className="desc-col">{product.description ?? '—'}</td>
+                    <td>{`$${product.price.toFixed(2)}`}</td>
+                    <td>{product.quantity}</td>
+                    <td>
+                      <button
+                        onClick={() => handleEdit(product)}
+                        className="primary"
+                        disabled={addMode}
+                        aria-busy={updating}
+                      >
+                        {editingId === product.id ? 'Close' : 'Edit'}
+                      </button>
+                    </td>
+                    <td>
+                      <button
+                        onClick={() => handleDelete(product.id)}
+                        className="danger"
+                        disabled={deletingIds.has(product.id)}
+                        aria-busy={deletingIds.has(product.id)}
+                      >
+                        Delete
+                      </button>
                     </td>
                   </tr>
-                ) : null}
-              </React.Fragment>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                  {editingId === product.id ? (
+                    <tr>
+                      <td colSpan={6} style={{ padding: 0 }}>
+                        <div style={{ padding: 16 }}>
+                          <ProductEditForm
+                            values={editValues}
+                            errors={editErrors}
+                            saving={updating}
+                            status={editErrors.form ?? null}
+                            onChange={handleFieldChange}
+                            onSave={handleSave}
+                            onCancel={resetEdit}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null}
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       <style>{`

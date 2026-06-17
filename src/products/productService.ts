@@ -1,19 +1,47 @@
-import api from './productApiClient'
+import apiClient from './productApiClient'
 import { Product, ProductInput } from './productTypes'
+import { BaseApi } from '../api/BaseApi'
 
-export async function listProducts(): Promise<Product[]> {
-  const resp = await api.get('/product')
-  return resp.data as Product[]
+/**
+ * Product Service
+ * 
+ * Extends BaseApi to provide typed product API endpoints with
+ * automatic error normalization and Auth0 token injection.
+ */
+export class ProductService extends BaseApi {
+  constructor() {
+    super(apiClient)
+  }
+
+  /**
+   * Fetch all products
+   */
+  async listProducts(): Promise<Product[]> {
+    return this.get<Product[]>('/product')
+  }
+
+  /**
+   * Create a new product
+   */
+  async createProduct(input: ProductInput): Promise<Product> {
+    return this.post<Product>('/product', input)
+  }
+
+  /**
+   * Update an existing product
+   */
+  async updateProduct(id: string, input: ProductInput): Promise<Product> {
+    return this.patch<Product>(`/product/${id}`, input)
+  }
+
+  /**
+   * Delete a product
+   */
+  async deleteProduct(id: string): Promise<void> {
+    return this.delete(`/product/${id}`)
+  }
 }
-export async function createProduct(input: ProductInput){
-  const resp = await api.post('/product', input)
-  return resp.data as Product
-}
-export async function updateProduct(id: string, input: ProductInput){
-  const resp = await api.patch(`/product/${id}`, input)
-  return resp.data as Product
-}
-export async function deleteProduct(id: string){
-  const resp = await api.delete(`/product/${id}`)
-  return resp.data
-}
+
+// Export singleton instance for use in Redux thunks
+export const productService = new ProductService()
+
