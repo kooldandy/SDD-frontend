@@ -22,7 +22,7 @@
     "@testing-library/react": "^14.0.0",
     "@vitejs/plugin-react": "^4.0.0",
     "jsdom": "^22.1.0",
-    "msw": "^1.2.1",
+    "msw": "^2.14.6",
     "playwright": "^1.40.0",
     "typescript": "^5.2.2",
     "vite": "^5.2.0",
