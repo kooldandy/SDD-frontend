@@ -36,3 +36,4 @@ class AuthAdapter {
 }
 
 export const authAdapter = new AuthAdapter();
+
