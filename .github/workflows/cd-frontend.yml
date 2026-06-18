@@ -60,6 +60,9 @@ jobs:
         env:
           # Your FastAPI production URL from your backend repo deployment
           VITE_API_URL: ${{ secrets.VITE_API_URL }} 
+          VITE_AUTH0_DOMAIN: ${{ secrets.VITE_AUTH0_DOMAIN }}
+          VITE_AUTH0_CLIENT_ID: ${{ secrets.VITE_AUTH0_CLIENT_ID }}
+          VITE_AUTH0_AUDIENCE: ${{ secrets.VITE_AUTH0_AUDIENCE }}
 
       # 5. Sync Compiled Assets to the newly created S3 Bucket
       - name: Upload Static Assets to S3
